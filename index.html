@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Latam TSO Dashboard | Monitoring Merchant Volume and Behaviour</title>
+<style>
+  :root {
+    --wp-deep:#003a70;
+    --wp-blue:#005aa3;
+    --wp-cyan:#00b3b3;
+    --bg:#f5f7fa;
+    --card-bg:#fff;
+    --text:#20262e;
+    --muted:#5a6b7b;
+  }
+  body {
+    margin:0; font-family:"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--text);
+  }
+  header {
+    background:linear-gradient(135deg,#000,#1f204b);
+    color:#fff; padding:16px 20px;
+    display:flex; align-items:center; justify-content:space-between;
+    position:fixed; top:0; left:0; right:0; z-index:1000;
+  }
+  header h1 {
+    margin:0; font-size:22px;
+  }
+  .dropdown {
+    display:flex; align-items:center; gap:10px;
+  }
+  select {
+    padding:8px 12px; font-size:15px; border-radius:6px;
+    border:none; outline:none; color:#333;
+  }
+  main {
+    margin-top:65px;
+  }
+  iframe {
+    width:100%; height:90vh; border:none;
+  }
+</style>
+<script>
+function loadReport() {
+  const select = document.getElementById('clientSelect');
+  const iframe = document.getElementById('reportFrame');
+  const file = select.value;
+  if(file) {
+    iframe.src = file;
+  }
+}
+</script>
+</head>
+<body>
+<header>
+  <a href="/tier1/byissuer/" target="reportFrame" style="color: inherit; text-decoration: none;"><h1>Latam TSO Dashboard | Monitoring Merchant Volume and Behaviour</h1></a>
+  <div class="dropdown">
+    <label for="clientSelect" style="font-size:15px;">Select Client:</label>
+    <select id="clientSelect" onchange="loadReport()">
+      <option value="">-- Choose a client --</option>
+      <option value="reports/wpgpeyaarsupercvv_issuers.html">PedidosYa</option>
+      <option value="reports/dlocal_issuers.html">DLocal</option>
+      <option value="reports/wpgpfbrtiktokadsecom_issuers.html">TikTok (Ebanx)</option>
+      <option value="reports/cabify_issuers.html">Cabify</option>
+      <option value="reports/cartpanda_issuers.html">Cartpanda</option>
+      <option value="reports/ebanx_issuers.html">EBANX</option>
+      <option value="reports/hotmart_issuers.html">Hotmart</option>
+      <option value="reports/gollinhasaereas_issuers.html">Gol Linhas Aereas</option>
+      <option value="reports/jetsmart_issuers.html">Jetsmart</option>
+      <option value="reports/tamlinhasaereas_issuers.html">TAM Linhas Aereas</option>
+      <option value="reports/microsoft_issuers.html">Microsoft</option>
+      <option value="reports/perfectpay_issuers.html">Perfect Pay</option>
+      <option value="reports/swiss_issuers.html">Swiss Airlines</option>
+      <option value="reports/copa_issuers.html">Copa Airlines</option>
+      <option value="reports/gympasssas_issuers.html">Gympass</option>
+      <option value="reports/ppro_issuers.html">PPRO</option>
+      <option value="reports/hillsidepasteko_issuers.html">Bet365</option>
+      <option value="reports/amazonmexico_issuers.html">Amazon MX</option>
+      <option value="reports/disneyplus_issuers.html">Disney</option>
+      <option value="reports/ubereats_issuers.html">Uber</option>
+    </select>
+  </div>
+</header>
+<main>
+  <iframe id="reportFrame" title="Client Report" src="reports/schemas_full.html"></iframe>
+</main>
+</body>
+</html>
