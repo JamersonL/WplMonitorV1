@@ -128,7 +128,7 @@ def build_html(now_display, merchants, overall, df_worst, img_ts_b64, img_worst_
 </html>
 """
 
-def build_html_mail(now_display, merchants, overall, alert_issuers, daily_curr):
+def build_html_mail(now_display, merchants, overall, alert_issuers, daily_curr, app_url=""):
     merchants_str = ", ".join(merchants)
 
     # Currency chips
@@ -152,6 +152,21 @@ def build_html_mail(now_display, merchants, overall, alert_issuers, daily_curr):
             for _, r in alert_issuers.iterrows()
         )
         issuers_html = f"<table border='1' cellpadding='4'><thead><tr><th>Issuer</th><th>Total Tx</th><th>%Rec.</th><th>Approval Rate</th></tr></thead><tbody>{rows}</tbody></table>"
+
+    from html import escape
+
+    if app_url:
+        safe_url = escape(app_url, quote=True)
+        app_link_html = (
+            f'<p><a href="{safe_url}" style="display:inline-block;background:#005aa3;color:#fff;'
+            f'padding:10px 16px;text-decoration:none;border-radius:4px;">Open WPL LatAm TSO Dashboard</a></p>'
+            f'<p style="font-size:12px;color:#666;">Direct link: <a href="{safe_url}">{safe_url}</a></p>'
+        )
+    else:
+        app_link_html = (
+            '<p style="font-size:12px;color:#666;">Dashboard link is not configured. '
+            'Set APP_BASE_URL in the application environment.</p>'
+        )
 
     return f"""
     <html>
@@ -177,6 +192,10 @@ def build_html_mail(now_display, merchants, overall, alert_issuers, daily_curr):
       <div class="card">
       <h3>Approved Amounts by Currency (Today)</h3>
       {currency_html}
+      </div>
+      <div class="card">
+      <h3>Monitoring Dashboard</h3>
+      {app_link_html}
       </div>
 
       <p style="color:#888;font-size:12px;">WP Confidential</p>
