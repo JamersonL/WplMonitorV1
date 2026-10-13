@@ -117,7 +117,7 @@ def run_once():
             if not alert_issuers.empty and (time(8, 0) <= now <= time(23, 0)):
                 last_time = last_alarm_time.get(merchant_slug)
                 if last_time is None or (datetime.now() - last_time) >= ALARM_COOLDOWN:
-                    html_mail = build_html_mail(now_disp, MERCHANT_NAMES, overall, alert_issuers, daily_curr)
+                    html_mail = build_html_mail(now_disp, MERCHANT_NAMES, overall, alert_issuers, daily_curr, APP_BASE_URL)
                     subject = f"[ALERT] {MERCHANT_NAMES[0]} Low Approval Rate for Issuer(s): {', '.join(alert_issuers['issuer_bank'])}"
                     send_email_mail(html_mail, subject, recipients_adm, HTML_OUTPUT)
                     last_alarm_time[merchant_slug] = datetime.now()
