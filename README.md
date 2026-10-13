@@ -183,6 +183,9 @@ The following values can be supplied through environment variables:
 
 Other operational values, including database connection configuration, report paths, and e-mail recipients, are currently defined directly in `config.py`.
 
+
+The merchant alert e-mail includes the issuer details table and a link to the dashboard. Configure `APP_BASE_URL` on the runtime host with the absolute dashboard URL, including the `/tier1/byissuer/` path (for example, `https://your-host.example/tier1/byissuer/`). The host value must be the real address used by recipients; the application does not infer a public hostname.
+
 ## Dependencies
 
 The main external Python dependencies are:
