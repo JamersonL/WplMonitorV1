@@ -122,7 +122,7 @@ def run_once():
                     send_email_mail(html_mail, subject, recipients_adm, HTML_OUTPUT)
                     last_alarm_time[merchant_slug] = datetime.now()
 
-                    html_mail_client = build_html_mail_client(now_disp, MERCHANT_NAMES, overall, alert_issuers, daily_curr, APP_BASE_URL)
+                    html_mail_client = build_html_mail_client(now_disp, MERCHANT_NAMES, overall, df_worst, daily_curr, APP_BASE_URL)
                     send_email_mail(html_mail_client,subject, recipients, None)
                     logging.info(f"Alarm sent for {aliases} at {last_alarm_time[merchant_slug]}")
                 else:
