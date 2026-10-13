@@ -263,7 +263,7 @@ def build_html_mail_client(now_display, merchants, overall, alert_issuers, daily
   </div>
   <p><strong>Generated:</strong> {generated_at}</p>
   <div class="card">
-    <h3>List of Affected Issuers</h3>
+    <h3>Issuer Details — last {WINDOW_MINUTES} minutes</h3>
     {issuers_html}
   </div>
   <div class="card">
