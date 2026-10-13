@@ -21,7 +21,7 @@ TZ_DISPLAY       = os.getenv("TZ_DISPLAY", "America/Sao_Paulo")  # server-side S
 recipients_adm = ["guilherme.sanches@worldpay.com"]#,"Jefferson.Nascimento@Worldpay.com"]
 recipients = ["DL.WP.LatAm.Infrastructure@worldpay.com"]
 report_path = "/var/www/html/tier1/byissuer/reports/"
-APP_BASE_URL = os.getenv("APP_BASE_URL", "").strip().rstrip("/")
+APP_BASE_URL = os.getenv("APP_BASE_URL", "https://ukdc1-pc-nag101.fnfis.com/tier1/byissuer/").strip().rstrip("/")
 
 html_style = f"""
   :root{{
