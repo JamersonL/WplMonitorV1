@@ -1,5 +1,4 @@
 """Alert evaluations and persistent per-merchant/per-alert cooldown state."""
-from __future__ import annotations
 
 import html
 import json
@@ -13,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_STATE_PATH = BASE_DIR / "config" / "alert_state.json"
 
 
-def is_within_schedule(now_time: time, schedule: dict[str, str]) -> bool:
+def is_within_schedule(now_time, schedule):
     start = time.fromisoformat(schedule["start"])
     end = time.fromisoformat(schedule["end"])
     if start < end:
@@ -33,7 +32,7 @@ def filter_issuer_alerts(df, rules):
     ]
 
 
-def evaluate_critical_drop(current_total: int, baseline_total: int, rules: dict):
+def evaluate_critical_drop(current_total, baseline_total, rules):
     if not rules.get("enabled", False):
         return None
     current = max(0, int(current_total or 0))
@@ -70,7 +69,7 @@ class AlertStateStore:
         if not raw:
             return None
         try:
-            last_sent = datetime.fromisoformat(raw)
+            last_sent = datetime.strptime(raw, "%Y-%m-%dT%H:%M:%S")
         except (TypeError, ValueError):
             return None
         remaining = timedelta(minutes=int(cooldown_minutes)) - (now - last_sent)
