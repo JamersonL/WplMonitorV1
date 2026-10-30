@@ -1,2 +1,8 @@
-Flask>=3.0,<4.0
-waitress>=3.0,<4.0
+# Pin versions that remain compatible with the default Python 3.6 runtime on RHEL 8.
+Flask==2.0.3
+Werkzeug==2.0.3
+Jinja2==3.0.3
+MarkupSafe==2.0.1
+itsdangerous==2.0.1
+click==8.0.4
+waitress==2.0.0
