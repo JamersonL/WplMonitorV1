@@ -1,5 +1,4 @@
 """Atomic, validated JSON storage for merchant alert rules."""
-from __future__ import annotations
 
 import copy
 import json
@@ -10,7 +9,6 @@ import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 try:
     import fcntl
@@ -38,7 +36,7 @@ DEFAULT_SETTINGS = {
 }
 
 
-def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+def _deep_merge(base, override):
     result = copy.deepcopy(base)
     for key, value in (override or {}).items():
         if isinstance(value, dict) and isinstance(result.get(key), dict):
