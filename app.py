@@ -29,7 +29,7 @@ def create_app(test_config=None):
         app.config.update(test_config)
     app.register_blueprint(admin_bp)
 
-    @app.get("/")
+    @app.route("/", methods=["GET"])
     def root():
         return redirect(url_for("admin.alerts"))
 
