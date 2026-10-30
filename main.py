@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from config import html_style, MERCHANT_NAMES, HTML_OUTPUT, WINDOW_MINUTES, TS_MINUTES, RUN_FOREVER, TOP_N_ISSUERS, recipients, directory_path, report_path, recipients_adm, APP_BASE_URL, TZ_DISPLAY
-from db_helpers import pg_connect, fetch_overall_metrics, fetch_worst_issuers, fetch_timeseries, fetch_daily_currency_totals, fetch_daily_metrics,fetch_schema_data,fetch_acq_data
+from db_helpers import pg_connect, fetch_overall_metrics, fetch_worst_issuers, fetch_timeseries, fetch_daily_currency_totals, fetch_daily_metrics, fetch_schema_data, fetch_acq_data
 from charts import plot_timeseries, plot_worst
-from html_templates import build_html, build_html_mail,build_html_mail_client,build_schemas_html
+from html_templates import build_html, build_html_mail, build_html_mail_client, build_schemas_html
 from utils import send_email_mutt, parse_clients_file, slugify, send_email_mail
-from datetime import datetime, timedelta
+from core.alert_config import AlertConfigStore
+from core.alert_engine import AlertStateStore, build_critical_drop_email, evaluate_critical_drop, filter_issuer_alerts, is_within_schedule
 from pandas.plotting import register_matplotlib_converters
 
-import os, time,sys
-import logging, traceback
+import os
+import sys
+import time as time_module
+import logging
+import traceback
 import pandas as pd
 
 register_matplotlib_converters()
 
-last_alarm_time = {}  # key = client slug, value = datetime
-ALARM_COOLDOWN = timedelta(minutes=WINDOW_MINUTES)
+alert_config_store = AlertConfigStore(legacy_window_minutes=WINDOW_MINUTES)
+alert_state_store = AlertStateStore()
 
 # ---------- Runner ----------
 def run_once():
@@ -109,25 +114,75 @@ def run_once():
             logging.info(f"Wrote {HTML_OUTPUT} — total={overall['total']} approved={overall['aprovadas']} rate={overall['taxa']:.2f}% | daily_total={daily['total']}")
 
 
-            alert_issuers = df_worst[(df_worst["total_tx"] > 150) & 
-                    (df_worst["approval_rate"] < 10) & 
-                    (df_worst["recurring_percentage"] < 70) ]
+            alert_settings = alert_config_store.get_merchant(merchant_slug)
+            alert_schedule = is_within_schedule(
+                datetime.now(ZoneInfo(TZ_DISPLAY)).time(), alert_settings["schedule"]
+            )
 
-            now = datetime.now().time()
-            if not alert_issuers.empty and (time(8, 0) <= now <= time(23, 0)):
-                last_time = last_alarm_time.get(merchant_slug)
-                if last_time is None or (datetime.now() - last_time) >= ALARM_COOLDOWN:
-                    html_mail = build_html_mail(now_disp, MERCHANT_NAMES, overall, alert_issuers, daily_curr, APP_BASE_URL)
-                    subject = f"[ALERT] {MERCHANT_NAMES[0]} Low Approval Rate for Issuer(s): {', '.join(alert_issuers['issuer_bank'])}"
+            # Existing issuer alert: preserve the original conditions as merchant-level rules.
+            alert_issuers = filter_issuer_alerts(df_worst, alert_settings["issuer"])
+            if alert_schedule and not alert_issuers.empty:
+                remaining = alert_state_store.cooldown_remaining(
+                    merchant_slug, "issuer", alert_settings["issuer"]["cooldown_minutes"]
+                )
+                if remaining is None:
+                    html_mail = build_html_mail(
+                        now_disp, MERCHANT_NAMES, overall, alert_issuers, daily_curr, APP_BASE_URL
+                    )
+                    subject = (
+                        f"[ALERT] {MERCHANT_NAMES[0]} Low Approval Rate for Issuer(s): "
+                        f"{', '.join(alert_issuers['issuer_bank'])}"
+                    )
                     send_email_mail(html_mail, subject, recipients_adm, HTML_OUTPUT)
-                    last_alarm_time[merchant_slug] = datetime.now()
-
-                    html_mail_client = build_html_mail_client(now_disp, MERCHANT_NAMES, overall, df_worst, daily_curr, APP_BASE_URL)
-                    send_email_mail(html_mail_client,subject, recipients, None)
-                    logging.info(f"Alarm sent for {aliases} at {last_alarm_time[merchant_slug]}")
+                    html_mail_client = build_html_mail_client(
+                        now_disp, MERCHANT_NAMES, overall, df_worst, daily_curr, APP_BASE_URL
+                    )
+                    send_email_mail(html_mail_client, subject, recipients, None)
+                    alert_state_store.mark_sent(merchant_slug, "issuer")
+                    logging.info("Issuer alarm sent for %s", aliases)
                 else:
-                    remaining = ALARM_COOLDOWN - (datetime.now() - last_time)
-                    logging.info(f"Alert suppressed for {aliases}. Cooldown active ({remaining.seconds//60} min left).")
+                    logging.info(
+                        "Issuer alert suppressed for %s. Cooldown active (%d min left).",
+                        aliases, int(remaining.total_seconds() // 60)
+                    )
+
+            # New merchant-level Critical Drop: current window versus equivalent D-7 window.
+            critical_drop = evaluate_critical_drop(
+                overall["total"], overall_d7["total"], alert_settings["critical_drop"]
+            )
+            if alert_schedule and critical_drop:
+                remaining = alert_state_store.cooldown_remaining(
+                    merchant_slug, "critical_drop",
+                    alert_settings["critical_drop"]["cooldown_minutes"]
+                )
+                if remaining is None:
+                    html_drop = build_critical_drop_email(
+                        merchant_name=MERCHANT_NAMES[0],
+                        current_total=critical_drop["current_total"],
+                        baseline_total=critical_drop["baseline_total"],
+                        drop_percent=critical_drop["drop_percent"],
+                        threshold_percent=critical_drop["threshold_percent"],
+                        window_minutes=WINDOW_MINUTES,
+                        app_base_url=APP_BASE_URL,
+                        merchant_slug=merchant_slug,
+                    )
+                    subject = (
+                        f"[CRITICAL DROP] {MERCHANT_NAMES[0]} - "
+                        f"volume down {critical_drop['drop_percent']:.2f}%"
+                    )
+                    send_email_mail(html_drop, subject, recipients_adm, None)
+                    send_email_mail(html_drop, subject, recipients, None)
+                    alert_state_store.mark_sent(merchant_slug, "critical_drop")
+                    logging.warning(
+                        "Critical Drop alert sent for %s: current=%s baseline_d7=%s drop=%.2f%%",
+                        aliases, critical_drop["current_total"], critical_drop["baseline_total"],
+                        critical_drop["drop_percent"]
+                    )
+                else:
+                    logging.info(
+                        "Critical Drop alert suppressed for %s. Cooldown active (%d min left).",
+                        aliases, int(remaining.total_seconds() // 60)
+                    )
         #END LOOP
         
         #Get Schemas
@@ -227,7 +282,7 @@ def run_once():
 def sleep_to_next_minute(pad=0.2):
     now = datetime.now()
     secs = 60 - now.second - now.microsecond/1_000_000
-    time.sleep(max(0.0, secs + pad))
+    time_module.sleep(max(0.0, secs + pad))
 
 def main():
     if RUN_FOREVER:
