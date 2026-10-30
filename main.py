@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from datetime import datetime
-from zoneinfo import ZoneInfo
 from config import html_style, MERCHANT_NAMES, HTML_OUTPUT, WINDOW_MINUTES, TS_MINUTES, RUN_FOREVER, TOP_N_ISSUERS, recipients, directory_path, report_path, recipients_adm, APP_BASE_URL, TZ_DISPLAY
 from db_helpers import pg_connect, fetch_overall_metrics, fetch_worst_issuers, fetch_timeseries, fetch_daily_currency_totals, fetch_daily_metrics, fetch_schema_data, fetch_acq_data
 from charts import plot_timeseries, plot_worst
@@ -101,7 +100,7 @@ def run_once():
             img_ts   = plot_timeseries(df_ts, MERCHANT_NAMES, TS_MINUTES)
             img_w    = plot_worst(df_worst, WINDOW_MINUTES)
 
-            now_disp = datetime.now(ZoneInfo(TZ_DISPLAY)).strftime("%Y-%m-%d %H:%M:%S")
+            now_disp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             html = build_html(
                 now_disp, MERCHANT_NAMES, overall, df_worst, img_ts, img_w,
@@ -116,7 +115,7 @@ def run_once():
 
             alert_settings = alert_config_store.get_merchant(merchant_slug)
             alert_schedule = is_within_schedule(
-                datetime.now(ZoneInfo(TZ_DISPLAY)).time(), alert_settings["schedule"]
+                datetime.now().time(), alert_settings["schedule"]
             )
 
             # Existing issuer alert: preserve the original conditions as merchant-level rules.
