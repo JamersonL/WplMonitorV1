@@ -1,5 +1,4 @@
 """Authenticated administrative pages for merchant alert configuration."""
-from __future__ import annotations
 
 from functools import wraps
 from pathlib import Path
@@ -50,7 +49,7 @@ def inject_template_helpers():
     return {"csrf_token": csrf_token}
 
 
-@admin_bp.get("")
+@admin_bp.route("", methods=["GET"])
 def admin_home():
     return redirect(url_for("admin.alerts"))
 
@@ -76,7 +75,7 @@ def login():
     return render_template("manager/login.html")
 
 
-@admin_bp.post("/logout")
+@admin_bp.route("/logout", methods=["POST"])
 @_login_required
 def logout():
     validate_csrf(request.form.get("csrf_token"))
