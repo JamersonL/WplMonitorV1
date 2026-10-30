@@ -1,5 +1,9 @@
-# Merge into the existing HTTPS VirtualHost. Do not replace dashboard mappings.
-# Keep the Flask/Gunicorn listener bound to 127.0.0.1.
+# Merge into the existing HTTPS VirtualHost; preserve all current dashboard mappings.
+# Put this specific admin route BEFORE any broader /tier1/byissuer/ ProxyPass rule.
+# mod_proxy, mod_proxy_http and mod_headers must already be enabled.
 ProxyPreserveHost On
-ProxyPass        /admin/ http://127.0.0.1:8010/admin/
-ProxyPassReverse /admin/ http://127.0.0.1:8010/admin/
+RequestHeader set X-Forwarded-Proto "https"
+RequestHeader set X-Forwarded-Prefix "/tier1/byissuer"
+
+ProxyPass        /tier1/byissuer/admin/ http://127.0.0.1:8010/admin/
+ProxyPassReverse /tier1/byissuer/admin/ http://127.0.0.1:8010/admin/
