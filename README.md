@@ -200,7 +200,7 @@ The host requires the local `sendmail` command for the primary e-mail implementa
 
 ## Operational considerations
 
-- Alert cooldown state is stored in process memory and is therefore reset when the application restarts.
+- Alert cooldown timestamps are persisted per merchant and alert type in the optional alert-administration feature; the runtime state file is local and must be writable by the monitor process.
 - `clientsT1.txt` is runtime configuration: changing aliases changes which database transactions are included in client metrics.
 - Report directories must exist and be writable by the process.
 - Several paths and operational settings are environment-specific, so the repository currently behaves more like an operational application/script than a fully packaged portable application.
@@ -215,3 +215,14 @@ The repository configuration contains infrastructure-specific connection and rec
 Based on the implementation, WplMonitorV1 is an operational payment-monitoring solution focused on near-real-time visibility into transaction approval performance across LATAM processing.
 
 Its main responsibilities are monitoring client performance, identifying issuer and schema degradation, comparing current activity with the same period seven days earlier, producing operational dashboards, and notifying support/operations teams when configured approval-rate conditions are detected.
+
+
+## Merchant alert administration (feature branch)
+
+The branch `feature/merchant-alerts-admin` adds an authenticated Flask administration console at `/admin/alerts` without replacing the existing monitoring dashboard or removing issuer alerts.
+
+The page lets an administrator configure issuer conditions and the new merchant-level Critical Drop rule independently for each merchant listed in `clientsT1.txt`. Critical Drop compares the current monitoring-window transaction count with the equivalent window seven days earlier (D-7). It triggers at or above the configured percentage drop, provided the D-7 baseline meets the minimum count. Critical Drop is disabled by default.
+
+The web console runs as a separate Flask/Gunicorn process. The existing `main.py` monitor remains the alert sender and reads the JSON policy on each monitoring cycle, so saved rules become effective on the next cycle without restarting the monitor.
+
+For install steps, credential setup, environment variables, reverse-proxy configuration, and testing, see `README_ALERT_ADMIN.md`. Do not commit active config files, administrator credentials, session secrets, or alert-state data.

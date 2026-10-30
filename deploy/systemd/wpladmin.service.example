@@ -1,0 +1,22 @@
+[Unit]
+Description=WPL Monitor Alert Administration Web
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+# Use the same dedicated, non-root account that owns the alert configuration files.
+User=wplmonitor
+Group=wplmonitor
+WorkingDirectory=/opt/WplMonitorV1
+EnvironmentFile=/etc/sysconfig/wpladmin
+Environment=WPL_ADMIN_HOST=127.0.0.1
+Environment=WPL_ADMIN_PORT=8010
+Environment=WPL_ADMIN_COOKIE_SECURE=true
+ExecStart=/opt/WplMonitorV1/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8010 --timeout 30 wsgi:app
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

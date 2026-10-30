@@ -1,0 +1,19 @@
+# Runtime credentials and alert state/configuration must never be committed
+/config/alerts.json
+/config/auth.json
+/config/alert_state.json
+/config/*.lock
+/config/backups/
+/config/*.tmp
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Tests and logs
+.pytest_cache/
+.coverage
+htmlcov/
+*.log

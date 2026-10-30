@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "defaults": {
+    "schedule": {"start": "08:00", "end": "23:00"},
+    "issuer": {
+      "enabled": true,
+      "min_transactions": 150,
+      "max_approval_rate": 10.0,
+      "max_recurring_percentage": 70.0,
+      "cooldown_minutes": 15
+    },
+    "critical_drop": {
+      "enabled": false,
+      "threshold_percent": 30.0,
+      "minimum_baseline_transactions": 150,
+      "cooldown_minutes": 30
+    }
+  },
+  "merchants": {
+    "merchant_slug": {
+      "schedule": {"start": "08:00", "end": "23:00"},
+      "issuer": {
+        "enabled": true,
+        "min_transactions": 150,
+        "max_approval_rate": 10.0,
+        "max_recurring_percentage": 70.0,
+        "cooldown_minutes": 15
+      },
+      "critical_drop": {
+        "enabled": false,
+        "threshold_percent": 30.0,
+        "minimum_baseline_transactions": 150,
+        "cooldown_minutes": 30
+      }
+    }
+  }
+}

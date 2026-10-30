@@ -1,0 +1,5 @@
+# Merge into the existing HTTPS VirtualHost. Do not replace dashboard mappings.
+# Keep the Flask/Gunicorn listener bound to 127.0.0.1.
+ProxyPreserveHost On
+ProxyPass        /admin/ http://127.0.0.1:8010/admin/
+ProxyPassReverse /admin/ http://127.0.0.1:8010/admin/
