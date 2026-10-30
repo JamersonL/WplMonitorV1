@@ -4,6 +4,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from flask import Flask, redirect, url_for
+from werkzeug.middleware.proxy_fix import ProxyFix
 from blueprints.admin import admin_bp
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -28,6 +29,18 @@ def create_app(test_config=None):
     if test_config:
         app.config.update(test_config)
     app.register_blueprint(admin_bp)
+
+    # Honor the trusted Apache reverse-proxy prefix (/tier1/byissuer).
+    proxy_count = int(os.getenv("PROXY_FIX_NUM_PROXIES", "1"))
+    if proxy_count > 0:
+        app.wsgi_app = ProxyFix(
+            app.wsgi_app,
+            x_for=proxy_count,
+            x_proto=proxy_count,
+            x_host=proxy_count,
+            x_port=proxy_count,
+            x_prefix=proxy_count,
+        )
 
     @app.route("/", methods=["GET"])
     def root():
