@@ -92,7 +92,7 @@ Example Apache reverse-proxy mapping (merge with the existing virtual host; do n
     ProxyPass        /admin/ http://127.0.0.1:8010/admin/
     ProxyPassReverse /admin/ http://127.0.0.1:8010/admin/
 
-The administrative app uses a secure session cookie, scrypt authentication, CSRF validation, standard security headers and no public link from the dashboard. Restrict /admin/ further at the network layer, VPN or Apache access-control layer where appropriate.
+The administrative app uses a secure session cookie, scrypt authentication, CSRF validation, standard security headers and no public link from the dashboard. It uses Werkzeug ProxyFix to honor the trusted Apache X-Forwarded-Prefix header. Restrict /admin/ further at the network layer, VPN or Apache access-control layer where appropriate.
 
 ## Operational behavior
 
