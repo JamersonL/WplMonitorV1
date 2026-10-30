@@ -54,11 +54,12 @@ Environment variables:
 
 ## Install and initialize
 
-Use the same Python environment as WplMonitorV1:
+Use a separate virtual environment for the administration website so the existing monitor's dependencies remain untouched. The pinned requirements support Python 3.6 on RHEL 8. For a network-isolated host, prepare a matching wheelhouse on a connected Linux machine, transfer it, then install:
 
-    python3 -m pip install -r requirements-admin.txt
+    python3 -m venv .venv-admin
+    .venv-admin/bin/python -m pip install --no-index --find-links ./wheelhouse -r requirements-admin.txt
     mkdir -p config/backups
-    python3 scripts/create_admin_auth.py
+    .venv-admin/bin/python scripts/create_admin_auth.py
 
 The credential helper prompts interactively and stores only a salted scrypt hash. It does not put the password in shell history.
 
@@ -73,7 +74,7 @@ Optionally seed config/alerts.json from config/alerts.example.json:
     cp config/alerts.example.json config/alerts.json
     chmod 600 config/alerts.json
 
-Replace the example merchant_slug key with the real merchant key. Keys are generated from the first alias in clientsT1.txt using the existing slugify helper. If the active JSON file is absent, built-in defaults are used and the file is created on the first save.
+Merchant-specific entries are generated when an administrator saves a merchant. Keys are generated from the first alias in clientsT1.txt using the existing slugify helper. The sample file contains no pre-populated merchant overrides.
 
 ## Run locally
 
@@ -83,7 +84,7 @@ Open http://127.0.0.1:8010/admin/alerts.
 
 For production, run behind Apache/Nginx over HTTPS and bind Flask to localhost:
 
-    gunicorn --workers 2 --bind 127.0.0.1:8010 --timeout 30 wsgi:app
+    .venv-admin/bin/waitress-serve --listen=127.0.0.1:8010 wsgi:app
 
 Example Apache reverse-proxy mapping (merge with the existing virtual host; do not replace dashboard mappings):
 
@@ -109,4 +110,4 @@ The administrative app uses a secure session cookie, scrypt authentication, CSRF
 
 ## Deployment note
 
-This feature adds a separate Flask/Gunicorn web process. It does not convert main.py into a Flask request handler. Deploy the web process as a separate systemd service and add the reverse-proxy mapping only after staging verification. The existing WPL monitor service remains the alert sender.
+This feature adds a separate Flask/Waitress web process. It does not convert main.py into a Flask request handler. Deploy the web process as a separate systemd service and add the reverse-proxy mapping only after staging verification. The existing WPL monitor service remains the alert sender.
