@@ -12,9 +12,14 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_STATE_PATH = BASE_DIR / "config" / "alert_state.json"
 
 
+def _parse_clock(value):
+    hour, minute = (int(part) for part in value.split(":"))
+    return time(hour, minute)
+
+
 def is_within_schedule(now_time, schedule):
-    start = time.fromisoformat(schedule["start"])
-    end = time.fromisoformat(schedule["end"])
+    start = _parse_clock(schedule["start"])
+    end = _parse_clock(schedule["end"])
     if start < end:
         return start <= now_time <= end
     return now_time >= start or now_time <= end
