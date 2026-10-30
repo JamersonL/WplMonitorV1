@@ -28,3 +28,5 @@ footer{text-align:center;color:var(--muted);font-size:11px;margin:34px 0}
 .login-card h1{color:var(--navy);margin:8px 0}.login-card form{margin-top:24px}.login-card label:not(:first-of-type){margin-top:16px}
 @media(max-width:780px){.topbar,.toolbar{align-items:stretch;flex-direction:column}.form-grid.three{grid-template-columns:repeat(2,minmax(0,1fr))}.actions{align-items:stretch;flex-direction:column}.actions button{width:100%}}
 @media(max-width:520px){.form-grid.two,.form-grid.three{grid-template-columns:1fr}.panel{padding:16px}.topbar{padding:18px}.page{padding:0 14px}}
+
+.merchant-picker{min-width:280px}.picker-controls{display:flex;gap:8px;align-items:center}.picker-controls select{min-width:180px}.secondary{background:#e9f2f9;color:var(--navy);white-space:nowrap}
