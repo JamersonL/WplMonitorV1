@@ -7,88 +7,83 @@ from email.utils import formatdate, make_msgid
 
 def send_email_mail(html_body: str, subject: str, recipients: list, attachment_path: str, from_addr: str = None):
     """
-    Sends one independent HTML email per recipient through the local MTA.
+    Sends an email with HTML body and one attachment by piping a MIME message
+    to the local MTA (sendmail). No SMTP login required.
 
-    Every recipient receives a separate message with an individual To header
-    and Message-ID. A failure for one recipient does not prevent attempts to
-    deliver to the remaining recipients.
+    Parameters
+    ----------
+    html_body : str
+        The HTML content to appear inline in the email body.
+    subject : str
+        Email subject.
+    recipients : list[str]
+        List of recipient email addresses.
+    attachment_path : str
+        Path to the file to attach (e.g., your full HTML report).
+    from_addr : str, optional
+        Envelope/sender address. If not provided, uses $EMAIL_FROM or 'noreply@localhost'.
     """
+
     if not recipients:
         raise ValueError("send_email_mail: recipients list is empty")
 
     if not from_addr:
         from_addr = "WPLatAm.TSO.Reports@worldpay.com"
 
-    # Detect attachment content type and read the attachment only once.
+    to_header = ", ".join(recipients)
+    message_id = make_msgid()  # RFC 5322 compliant
+    date_hdr   = formatdate(localtime=True)
+    boundary   = f"==BOUNDARY_{int(time.time())}_{os.getpid()}=="
+
+    # Detect attachment content type and name
     attach_name = os.path.basename(attachment_path) if attachment_path else None
     ctype, _ = mimetypes.guess_type(attach_name or "")
     if not ctype:
         ctype = "application/octet-stream"
 
+    # Read and base64-encode the attachment (if any)
     attachment_part = ""
     if attachment_path and os.path.isfile(attachment_path):
         with open(attachment_path, "rb") as f:
             b64 = base64.b64encode(f.read()).decode("ascii")
 
         attachment_part = (
-            "Content-Type: %s; name=\"%s\"\n"
-            "Content-Transfer-Encoding: base64\n"
-            "Content-Disposition: attachment; filename=\"%s\"\n\n"
-            "%s\n"
-        ) % (ctype, attach_name, attach_name, b64)
+            f"\n--{boundary}\n"
+            f"Content-Type: {ctype}; name=\"{attach_name}\"\n"
+            f"Content-Transfer-Encoding: base64\n"
+            f"Content-Disposition: attachment; filename=\"{attach_name}\"\n\n"
+            f"{b64}\n"
+        )
 
+    # Build full MIME message
+    # NOTE: first part is text/html; adjust charset if needed
+    raw = (
+        f"From: {from_addr}\n"
+        f"To: {to_header}\n"
+        f"Subject: {subject}\n"
+        f"Message-ID: {message_id}\n"
+        f"Date: {date_hdr}\n"
+        f"MIME-Version: 1.0\n"
+        f"Content-Type: multipart/mixed; boundary=\"{boundary}\"\n"
+        f"\n"
+        f"--{boundary}\n"
+        f"Content-Type: text/html; charset=\"utf-8\"\n"
+        f"Content-Transfer-Encoding: 8bit\n\n"
+        f"{html_body}\n"
+        f"{attachment_part}"
+        f"--{boundary}--\n"
+    ).encode("utf-8", errors="replace")
+
+    # Pipe to local MTA
+    # -t : read recipients from headers (To/Cc/Bcc)
+    # -oi: dot-stuffing off (don’t treat lone '.' as message end)
     cmd = ["/usr/sbin/sendmail", "-t", "-oi"]
-    failures = []
-
-    for recipient in recipients:
-        recipient = recipient.strip()
-        if not recipient:
-            continue
-
-        message_id = make_msgid()
-        date_hdr = formatdate(localtime=True)
-        boundary = "==BOUNDARY_%s_%s==" % (int(time.time() * 1000000), os.getpid())
-
-        raw = (
-            "From: %s\n"
-            "To: %s\n"
-            "Subject: %s\n"
-            "Message-ID: %s\n"
-            "Date: %s\n"
-            "MIME-Version: 1.0\n"
-            "Content-Type: multipart/mixed; boundary=\"%s\"\n"
-            "\n"
-            "--%s\n"
-            "Content-Type: text/html; charset=\"utf-8\"\n"
-            "Content-Transfer-Encoding: 8bit\n\n"
-            "%s\n"
-            "%s"
-            "--%s--\n"
-        ) % (
-            from_addr, recipient, subject, message_id, date_hdr, boundary,
-            boundary, html_body, attachment_part, boundary
-        )
-
-        try:
-            subprocess.run(
-                cmd,
-                input=raw.encode("utf-8", errors="replace"),
-                check=True
-            )
-        except subprocess.CalledProcessError as exc:
-            failures.append("%s: %s" % (recipient, exc))
-        except OSError as exc:
-            failures.append("%s: %s" % (recipient, exc))
-
-    if failures:
-        raise RuntimeError(
-            "send_email_mail: failed to send to: " + "; ".join(failures)
-        )
+    subprocess.run(cmd, input=raw, check=True)
 
 def send_email_mutt(html_body, subject, recipients, attachment_path):
     """
     Sends email using mutt:
-      - html_body: string for inline body
+      - html_body: string with HTML content for inline body
       - subject: email subject
       - recipients: list of email addresses
       - attachment_path: path to attach the full HTML report
