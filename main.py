@@ -438,28 +438,56 @@ def run_once():
         logging.info(f"Wrote {HTML_OUTPUT} ")
 
         now = datetime.now().time()
-        if (send_alarm == True and dtime(6, 0) <= now <= dtime(22, 0)):
-            if last_alarm_time.get("ACQ") is None or (datetime.now() - last_alarm_time["ACQ"]) >= ALARM_COOLDOWN:
-                last_alarm_time["ACQ"] = datetime.now()
-                drop_volume_clients = list(dict.fromkeys(
-                    client_data.get("client_display_name", client_data["client"][0])
-                    for client_data in overall_clients
-                    if client_data.get("alert_type") == "drop_volume"
-                    and client_data.get("alarm_eligible", False)
-                ))
-                if drop_volume_clients:
-                    subject = f"LATAM TSO Dashboard Drop Volume [{', '.join(drop_volume_clients)}]"
+        if send_alarm and dtime(6, 0) <= now <= dtime(22, 0):
+            # Send one alert email per merchant. Never combine multiple merchants
+            # in the same alert message.
+            for client_data in overall_clients:
+                if not client_data.get("alarm_eligible", False):
+                    continue
+
+                merchant_name = client_data.get(
+                    "client_display_name", client_data["client"][0]
+                )
+                merchant_slug = slugify(client_data["client"][0].lower())
+                cooldown_key = f"ACQ:{merchant_slug}"
+
+                last_sent = last_alarm_time.get(cooldown_key)
+                if last_sent is not None and (
+                    datetime.now() - last_sent
+                ) < ALARM_COOLDOWN:
+                    logging.info(
+                        "Alert suppressed for merchant %s. Cooldown active (last sent %s).",
+                        merchant_name,
+                        last_sent,
+                    )
+                    continue
+
+                if client_data.get("alert_type") == "drop_volume":
+                    subject = f"LATAM TSO Dashboard Drop Volume [{merchant_name}]"
+                elif client_data.get("alert_type") == "drop_rate":
+                    subject = f"LATAM TSO Dashboard Drop Approval Rate [{merchant_name}]"
                 else:
-                    subject = "LATAM TSO Dashboard"
-                html = build_schemas_html_email(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), schema_df,acq_data,overall_clients)
+                    subject = f"LATAM TSO Dashboard [{merchant_name}]"
 
-                send_email_mail(html, subject, recipients,"")
+                merchant_html = build_schemas_html_email(
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    schema_df,
+                    acq_data,
+                    [client_data],
+                )
+                send_email_mail(merchant_html, subject, recipients, "")
+                last_alarm_time[cooldown_key] = datetime.now()
 
+                logging.info(
+                    "Merchant alert email sent separately | merchant=%s | subject=%s",
+                    merchant_name,
+                    subject,
+                )
+
+                # Preserve a copy of the last generated alert email.
                 HTML_OUTPUT = f"{report_path}/schemas_full_m.html"
                 with open(HTML_OUTPUT, "w", encoding="utf-8") as f:
-                    f.write(html)
-            else:
-                logging.info(f"""Alert suppressed for ACQ. Cooldown active or out of window last ({last_alarm_time["ACQ"]}).""")
+                    f.write(merchant_html)
 
 
     finally:
