@@ -1,0 +1,47 @@
+# Production secrets and configuration
+config.py
+clientsT1.txt
+.env
+.env.*
+!.env.example
+config/auth.json
+config/alerts.json
+config/alert_state.json
+config/*.lock
+config/backups/
+
+# Runtime logs and generated data
+*.log
+*.log.*
+*.pid
+*.tmp
+*.sqlite
+*.db
+reports/
+backups/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+
+# Virtual environments
+.venv/
+.venv-*/
+venv/
+
+# Historical backups and local export files
+backup/
+backup_*/
+2026*/
+*.bak
+*.bak_*
+*.tar.gz
+*.zip
+
+# IDE and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

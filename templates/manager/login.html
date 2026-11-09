@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WPL Monitor · Admin sign in</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body class="login-page">
+  <main class="login-card">
+    <div class="eyebrow">WPL LATAM TSO</div>
+    <h1>Administrator sign in</h1>
+    <p class="muted">Access to merchant alert rules is restricted.</p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}
+    {% endwith %}
+    <form method="post" autocomplete="on">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="username">Username</label>
+      <input id="username" name="username" required autocomplete="username" maxlength="100">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" required autocomplete="current-password" maxlength="1024">
+      <button class="primary full" type="submit">Sign in</button>
+    </form>
+    <p class="muted small">WPL Monitor · Administrative console</p>
+  </main>
+</body>
+</html>

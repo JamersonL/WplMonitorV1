@@ -1,0 +1,4 @@
+# Complete WPL Monitor runtime
+# Install on a compatible Python 3.6 environment.
+-r requirements-monitor.txt
+-r requirements-admin.txt

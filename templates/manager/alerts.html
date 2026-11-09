@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Alert Rules · WPL Monitor</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div><div class="eyebrow">WPL LATAM TSO</div><h1>Alert Rules Configuration</h1></div>
+    <form method="post" action="{{ url_for('admin.logout') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="quiet" type="submit">Sign out</button>
+    </form>
+  </header>
+  <main class="page">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}
+    {% endwith %}
+    {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+    {% if merchants and selected and settings %}
+      <section class="toolbar">
+        <div><span class="eyebrow">MERCHANT</span><h2>{{ selected.name }}</h2></div>
+        <form method="get" action="{{ url_for('admin.alerts') }}" class="merchant-picker">
+          <label for="merchant">Select merchant</label>
+          <div class="picker-controls">
+            <select id="merchant" name="merchant">
+              {% for merchant in merchants %}
+                <option value="{{ merchant.key }}" {% if merchant.key == selected.key %}selected{% endif %}>{{ merchant.name }}</option>
+              {% endfor %}
+            </select>
+            <button class="secondary" type="submit">Load merchant</button>
+          </div>
+        </form>
+      </section>
+      <form method="post" action="{{ url_for('admin.alerts', merchant=selected.key) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="merchant" value="{{ selected.key }}">
+        <section class="panel">
+          <div class="panel-heading"><div><span class="eyebrow">COMMON SETTINGS</span><h2>Alert schedule</h2></div></div>
+          <p class="muted">These operating hours apply to both issuer and Critical Drop alerts. Times use the configured WPL timezone.</p>
+          <div class="form-grid two">
+            <div><label for="schedule_start">Start time</label><input id="schedule_start" name="schedule_start" type="time" required value="{{ settings.schedule.start }}"></div>
+            <div><label for="schedule_end">End time</label><input id="schedule_end" name="schedule_end" type="time" required value="{{ settings.schedule.end }}"></div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading">
+            <div><span class="eyebrow">EXISTING ALERT TYPE</span><h2>Issuer approval degradation</h2></div>
+            <label class="switch"><input type="checkbox" name="issuer_enabled" {% if settings.issuer.enabled %}checked{% endif %}><span>Enabled</span></label>
+          </div>
+          <p class="muted">Preserves the current issuer-level conditions while allowing thresholds and cooldown to be set per merchant.</p>
+          <div class="form-grid three">
+            <div><label for="issuer_min_transactions">Minimum issuer transactions</label><input id="issuer_min_transactions" name="issuer_min_transactions" type="number" min="0" max="10000000" step="1" required value="{{ settings.issuer.min_transactions }}"></div>
+            <div><label for="issuer_max_approval_rate">Maximum approval rate (%)</label><input id="issuer_max_approval_rate" name="issuer_max_approval_rate" type="number" min="0" max="100" step="0.1" required value="{{ settings.issuer.max_approval_rate }}"></div>
+            <div><label for="issuer_max_recurring_percentage">Maximum recurring (%)</label><input id="issuer_max_recurring_percentage" name="issuer_max_recurring_percentage" type="number" min="0" max="100" step="0.1" required value="{{ settings.issuer.max_recurring_percentage }}"></div>
+            <div><label for="issuer_cooldown_minutes">Issuer alert cooldown (minutes)</label><input id="issuer_cooldown_minutes" name="issuer_cooldown_minutes" type="number" min="1" max="10080" step="1" required value="{{ settings.issuer.cooldown_minutes }}"></div>
+          </div>
+        </section>
+        <section class="panel critical">
+          <div class="panel-heading">
+            <div><span class="eyebrow">NEW ALERT TYPE</span><h2>Critical Drop · Merchant volume</h2></div>
+            <label class="switch"><input type="checkbox" name="critical_drop_enabled" {% if settings.critical_drop.enabled %}checked{% endif %}><span>Enabled</span></label>
+          </div>
+          <p class="muted">Compares this merchant's transaction volume in the current monitoring window with the equivalent window seven days earlier (D-7).</p>
+          <div class="form-grid three">
+            <div><label for="critical_drop_threshold">Critical Drop Threshold (%)</label><input id="critical_drop_threshold" name="critical_drop_threshold" type="number" min="0.1" max="100" step="0.1" required value="{{ settings.critical_drop.threshold_percent }}"></div>
+            <div><label for="critical_drop_minimum_baseline">Minimum D-7 baseline transactions</label><input id="critical_drop_minimum_baseline" name="critical_drop_minimum_baseline" type="number" min="1" max="10000000" step="1" required value="{{ settings.critical_drop.minimum_baseline_transactions }}"></div>
+            <div><label for="critical_drop_cooldown_minutes">Critical Drop cooldown (minutes)</label><input id="critical_drop_cooldown_minutes" name="critical_drop_cooldown_minutes" type="number" min="1" max="10080" step="1" required value="{{ settings.critical_drop.cooldown_minutes }}"></div>
+          </div>
+          <div class="hint">Example: a threshold of 30% triggers when the current window is at least 30% below the D-7 baseline, provided the baseline meets the minimum transaction count.</div>
+        </section>
+        <div class="actions"><span class="muted small">Changes are saved to the server's local JSON configuration and are read by the monitor without restart.</span><button class="primary" type="submit">Save alert rules</button></div>
+      </form>
+    {% else %}
+      <section class="panel"><p class="muted">The merchant registry or alert configuration is unavailable. Check the application log and clientsT1.txt.</p></section>
+    {% endif %}
+    <footer>WPL Monitor · Restricted administrative area</footer>
+  </main>
+</body>
+</html>

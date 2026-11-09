@@ -1,0 +1,7 @@
+# WPL Monitor - merchant configuration example
+# One merchant per line.
+# Separate aliases for the same merchant with commas.
+# Replace these examples with the merchant aliases required by your database.
+
+Example Merchant, Example Merchant Alias
+Another Example Merchant

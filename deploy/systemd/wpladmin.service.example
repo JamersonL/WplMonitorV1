@@ -1,0 +1,21 @@
+[Unit]
+Description=WPL Monitor Alert Administration Web
+After=network.target
+
+[Service]
+Type=simple
+# Replace paths and account to match the host's WPL Monitor installation.
+User=CHANGE_TO_WPL_REPORTS_USER
+Group=CHANGE_TO_WPL_REPORTS_GROUP
+WorkingDirectory=/opt/WplMonitorV1
+EnvironmentFile=/etc/sysconfig/wpladmin
+Environment=WPL_ADMIN_HOST=127.0.0.1
+Environment=WPL_ADMIN_PORT=8010
+Environment=WPL_ADMIN_COOKIE_SECURE=true
+ExecStart=/opt/WplMonitorV1/.venv-admin/bin/waitress-serve --listen=127.0.0.1:8010 wsgi:app
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

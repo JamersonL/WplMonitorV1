@@ -1,0 +1,13 @@
+# Monitor dependencies - Python 3.6.8 / RHEL 8
+numpy==1.14.3
+pandas==0.25.3
+matplotlib==3.0.3
+psycopg2==2.7.5
+python-dateutil==2.6.1
+pytz==2017.2
+six==1.11.0
+cycler==0.10.0
+kiwisolver==1.1.0
+pyparsing==2.1.10
+Pillow==5.1.1
+numexpr==2.7.0

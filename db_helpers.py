@@ -108,40 +108,130 @@ def pg_connect():
         cur.execute("SET TIME ZONE %s;", (TZ_DISPLAY,))
     return conn
 
+
+@retry_on_recovery_conflict
+def fetch_by_terminals_w3(conn, merchants, win_minutes):
+    sql = """
+    WITH clientes_filtrados AS (
+      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s) OR codigo_cliente = ANY(%s)
+    )
+    SELECT
+      codigo_cliente,
+      COUNT(*) FILTER (WHERE status_autorizacao = '00') AS transacoes_aprovadas,
+      ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (),2) AS percentual
+    FROM transacoes_aprova_facil
+    WHERE (data_hora_recebimento between date_trunc('minute', (now() - INTERVAL '7 days') - (%s)::interval)and 
+	        date_trunc('minute', (now() - INTERVAL '7 days')) OR
+			data_hora_recebimento between date_trunc('minute', (now() - INTERVAL '14 days') - (%s)::interval)and 
+	        date_trunc('minute', (now() - INTERVAL '14 days')) OR
+			data_hora_recebimento between date_trunc('minute', (now() - INTERVAL '21 days') - (%s)::interval)and 
+	        date_trunc('minute', (now() - INTERVAL '21 days')) 
+			)
+      AND codigo_cliente IN (SELECT codigo_cliente FROM clientes_filtrados)
+      group by codigo_cliente
+      order by percentual DESC;
+    """
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cur.execute(sql, (merchants, merchants, f"{win_minutes} minutes", f"{win_minutes} minutes", f"{win_minutes} minutes"))
+        rows = cur.fetchall()
+    return {
+        "rows": rows,
+        "win_minutes": win_minutes
+    }
+
+@retry_on_recovery_conflict
+def fetch_by_terminals(conn, merchants, win_minutes,days_ago):
+    sql = """
+    WITH clientes_filtrados AS (
+      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s) OR codigo_cliente = ANY(%s)
+    )
+    SELECT
+      codigo_cliente,
+      COUNT(*) FILTER (WHERE status_autorizacao = '00') AS transacoes_aprovadas,
+      ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (),2) AS percentual
+    FROM transacoes_aprova_facil
+    WHERE data_hora_recebimento >= date_trunc('minute', (now() - INTERVAL '%s days') - (%s)::interval)
+      AND data_hora_recebimento <  date_trunc('minute', (now() - INTERVAL '%s days'))
+      AND codigo_cliente IN (SELECT codigo_cliente FROM clientes_filtrados)
+      group by codigo_cliente
+      order by percentual DESC;
+    """
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cur.execute(sql, (merchants, merchants, days_ago, f"{win_minutes} minutes", days_ago))
+        rows = cur.fetchall()
+    return {
+        "rows": rows,
+        "win_minutes": win_minutes
+    }
+
 @retry_on_recovery_conflict
 def fetch_overall_metrics(conn, merchants, win_minutes,days_ago):
     sql = """
     WITH clientes_filtrados AS (
-      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s)
+      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s) OR codigo_cliente = ANY(%s)
     )
     SELECT
       COUNT(*) AS total_transacoes,
-      COUNT(*) FILTER (WHERE status_autorizacao = '00') AS transacoes_aprovadas
+      COUNT(*) FILTER (WHERE status_autorizacao = '00') AS transacoes_aprovadas,
+      ROUND(AVG(EXTRACT(EPOCH FROM (data_hora_processamento::timestamp - data_hora_recebimento::timestamp))),3) AS avg_latency_sec
     FROM transacoes_aprova_facil
     WHERE data_hora_recebimento >= date_trunc('minute', (now() - INTERVAL '%s days') - (%s)::interval)
       AND data_hora_recebimento <  date_trunc('minute', (now() - INTERVAL '%s days'))
       AND codigo_cliente IN (SELECT codigo_cliente FROM clientes_filtrados);
     """
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-        cur.execute(sql, (merchants, days_ago, f"{win_minutes} minutes", days_ago))
+        cur.execute(sql, (merchants, merchants, days_ago, f"{win_minutes} minutes", days_ago))
         row = cur.fetchone()
     total = (row["total_transacoes"] or 0)
     aprov = (row["transacoes_aprovadas"] or 0)
+    avg_latency_sec = (row["avg_latency_sec"] or 0)
     rate = round((aprov / total * 100.0), 2) if total else 0.0
-    return dict(total=total, aprovadas=aprov, taxa=rate)
+    return dict(total=total, aprovadas=aprov, taxa=rate, win_minutes=win_minutes, avg_latency_sec=avg_latency_sec)
+
+@retry_on_recovery_conflict
+def fetch_overall_metrics_w3(conn, merchants, win_minutes):
+    sql = """
+    WITH clientes_filtrados AS (
+      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s) OR codigo_cliente = ANY(%s)
+    )
+    SELECT
+      COUNT(*)/3 AS total_transacoes,
+      (COUNT(*) FILTER (WHERE status_autorizacao = '00'))/3 AS transacoes_aprovadas,
+      ROUND(AVG(EXTRACT(EPOCH FROM (data_hora_processamento::timestamp - data_hora_recebimento::timestamp))),3) AS avg_latency_sec
+    FROM transacoes_aprova_facil
+    WHERE (data_hora_recebimento between date_trunc('minute', (now() - INTERVAL '7 days') - (%s)::interval)and 
+	        date_trunc('minute', (now() - INTERVAL '7 days')) OR
+			data_hora_recebimento between date_trunc('minute', (now() - INTERVAL '14 days') - (%s)::interval)and 
+	        date_trunc('minute', (now() - INTERVAL '14 days')) OR
+			data_hora_recebimento between date_trunc('minute', (now() - INTERVAL '21 days') - (%s)::interval)and 
+	        date_trunc('minute', (now() - INTERVAL '21 days')) 
+			)
+      AND codigo_cliente IN (SELECT codigo_cliente FROM clientes_filtrados);
+    """
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cur.execute(sql, (merchants, merchants,  f"{win_minutes} minutes", f"{win_minutes} minutes", f"{win_minutes} minutes" ))
+        row = cur.fetchone()
+    total = (row["total_transacoes"] or 0)
+    aprov = (row["transacoes_aprovadas"] or 0)
+    avg_latency_sec = (row["avg_latency_sec"] or 0)
+    rate = round((aprov / total * 100.0), 2) if total else 0.0
+    return dict(total=total, aprovadas=aprov, taxa=rate, win_minutes=win_minutes, avg_latency_sec=avg_latency_sec)
 
 @retry_on_recovery_conflict
 def fetch_worst_issuers(conn, merchants, win_minutes, top_n):
     sql = """
     WITH clientes_filtrados AS (
-      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s)
+      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s) OR codigo_cliente = ANY(%s)
     )
     SELECT
       INITCAP(COALESCE(COALESCE(NULLIF(js.dados->>'BinTable_BancoEmissor', ''), NULLIF(js.dados->>'IssuerName','')), 'Unknown')) AS issuer_bank,
-   --   COALESCE(NULLIF(js.dados->>'BinTable_BancoEmissor',''), 'Unknown') AS issuer_bank,
+      t.codigo_cliente as codigo_cliente,
+      t.administradora as administradora, 
+      case when COALESCE(NULLIF(js.dados->>'VisaElectron',''), 'Unknown') = 'T' then 'Debit' else 'Credit' end as "cred_deb",
       COUNT(*) AS total_tx,
       COUNT(*) FILTER (WHERE t.status_autorizacao = '00') AS approved,
       COUNT(*) FILTER (WHERE t.status_autorizacao <> '00') AS declined,
+      COUNT(*) FILTER (WHERE t.status_autorizacao IN (NULL,'91','96','30','06')) AS err,
       ROUND(
         CASE WHEN COUNT(*) > 0 THEN
           (COUNT(*) FILTER (WHERE t.status_autorizacao = '00'))::decimal / COUNT(*) * 100
@@ -151,26 +241,27 @@ def fetch_worst_issuers(conn, merchants, win_minutes, top_n):
         CASE WHEN COUNT(*) > 0 THEN
             (COUNT(*) FILTER (WHERE dados->>'storedCredentials_merchantInitiatedReason' = 'RECURRING'))::decimal / COUNT(*) * 100
         ELSE 0 END, 2
-      ) AS recurring_percentage
+      ) AS recurring_percentage,
+      ROUND(AVG(EXTRACT(EPOCH FROM (t.data_hora_processamento::timestamp - t.data_hora_recebimento::timestamp))),3) AS avg_latency_sec
     FROM transacoes_aprova_facil t
     JOIN campos_transacoes_json js ON t.numero_transacao = js.numero_transacao
     WHERE t.data_hora_recebimento >= date_trunc('minute', now() - (%s)::interval)
       AND t.data_hora_recebimento <  date_trunc('minute', now())
       AND t.codigo_cliente IN (SELECT codigo_cliente FROM clientes_filtrados)
-    GROUP BY 1
+    GROUP BY 1,2,3,4
     ORDER BY declined DESC, approval_rate ASC
     LIMIT %s;
     """
     with conn.cursor() as cur:
-        cur.execute(sql, (merchants, f"{win_minutes} minutes", top_n))
+        cur.execute(sql, (merchants,merchants, f"{win_minutes} minutes", top_n))
         rows = cur.fetchall()
-    return pd.DataFrame(rows, columns=["issuer_bank","total_tx","approved","declined","approval_rate", "recurring_percentage"])
+    return pd.DataFrame(rows, columns=["issuer_bank","codigo_cliente","administradora","cred_deb", "total_tx","approved","declined","err","approval_rate", "recurring_percentage","avg_latency_sec"])
 
 @retry_on_recovery_conflict
 def fetch_timeseries(conn, merchants, lookback_minutes):
     sql = """
     WITH clientes_filtrados AS (
-      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s)
+      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s) OR codigo_cliente = ANY(%s)
     )
     SELECT
       date_trunc('minute', data_hora_recebimento) AS minute,
@@ -183,7 +274,7 @@ def fetch_timeseries(conn, merchants, lookback_minutes):
     ORDER BY 1;
     """
     with conn.cursor() as cur:
-        cur.execute(sql, (merchants, f"{lookback_minutes} minutes"))
+        cur.execute(sql, (merchants,merchants, f"{lookback_minutes} minutes"))
         rows = cur.fetchall()
     df = pd.DataFrame(rows, columns=["minute","total","approved"])
     if not df.empty:
@@ -191,6 +282,139 @@ def fetch_timeseries(conn, merchants, lookback_minutes):
         df["rate"]   = (df["approved"] / df["total"] * 100).round(2)
     else:
         df["rate"] = pd.Series(dtype=float)
+    return df
+
+@retry_on_recovery_conflict
+def fetch_timeseries_3w(conn, merchants, lookback_minutes):
+    sql = """
+    WITH clientes_filtrados AS (
+      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s) OR codigo_cliente = ANY(%s)
+    )
+    SELECT
+      date_trunc('day',localtimestamp ) + date_trunc('minute', data_hora_recebimento)::time AS minute,
+      COUNT(*)/3 AS total,
+      (COUNT(*) FILTER (WHERE status_autorizacao = '00'))/3 AS approved
+    FROM transacoes_aprova_facil
+	WHERE (data_hora_recebimento between date_trunc('minute', (now() - INTERVAL '7 days') - (%s)::interval)and 
+	        date_trunc('minute', (now() - INTERVAL '7 days')) OR
+			data_hora_recebimento between date_trunc('minute', (now() - INTERVAL '14 days') - (%s)::interval)and 
+	        date_trunc('minute', (now() - INTERVAL '14 days')) OR
+			data_hora_recebimento between date_trunc('minute', (now() - INTERVAL '21 days') - (%s)::interval)and 
+	        date_trunc('minute', (now() - INTERVAL '21 days')) 
+			)
+      AND codigo_cliente IN (SELECT codigo_cliente FROM clientes_filtrados)
+    GROUP BY date_trunc('minute', data_hora_recebimento)::time
+    ORDER BY 1;
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, (merchants,merchants, f"{lookback_minutes} minutes", f"{lookback_minutes} minutes", f"{lookback_minutes} minutes"))
+        rows = cur.fetchall()
+    df = pd.DataFrame(rows, columns=["minute","total","approved"])
+    if not df.empty:
+        df["minute"] = pd.to_datetime(df["minute"])
+        df["rate"]   = (df["approved"] / df["total"] * 100).round(2)
+    else:
+        df["rate"] = pd.Series(dtype=float)
+    return df
+
+
+@retry_on_recovery_conflict
+def fetch_timeseries_comp(conn, merchants, lookback_minutes, days_ago):
+    # allow both:
+    # days_ago = 7
+    # days_ago = [7, 14, 21]
+    if isinstance(days_ago, int):
+        days_ago = [days_ago]
+    else:
+        days_ago = list(days_ago)
+
+    sql = """
+    WITH dias AS (
+        SELECT unnest(%s::int[]) AS d
+    ),
+    janelas AS (
+        SELECT
+            d,
+            date_trunc(
+                'minute',
+                (now() - (d || ' days')::interval) - (%s)::interval
+            ) AS start_ts,
+            date_trunc(
+                'minute',
+                now() - (d || ' days')::interval
+            ) AS end_ts
+        FROM dias
+    ),
+    clientes_filtrados AS (
+        SELECT codigo_cliente
+        FROM clientes
+        WHERE nome_loja_resumido = ANY(%s)
+           OR codigo_cliente = ANY(%s)
+    ),
+    base AS (
+        SELECT
+            j.d,
+            FLOOR(
+                EXTRACT(
+                    EPOCH FROM (
+                        date_trunc('minute', t.data_hora_recebimento) - j.start_ts
+                    )
+                ) / 60
+            )::int AS minute_offset,
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE t.status_autorizacao = '00') AS approved
+        FROM janelas j
+        JOIN transacoes_aprova_facil t
+          ON t.data_hora_recebimento >= j.start_ts
+         AND t.data_hora_recebimento <  j.end_ts
+        WHERE t.codigo_cliente IN (
+            SELECT codigo_cliente FROM clientes_filtrados
+        )
+        GROUP BY j.d, minute_offset
+    ),
+    avg_by_minute AS (
+        SELECT
+            minute_offset,
+            AVG(total)::double precision AS total,
+            AVG(approved)::double precision AS approved
+        FROM base
+        GROUP BY minute_offset
+    ),
+    eixo_atual AS (
+        SELECT date_trunc('minute', now() - (%s)::interval) AS start_ts
+    )
+    SELECT
+        e.start_ts + (a.minute_offset * interval '1 minute') AS minute,
+        a.total,
+        a.approved
+    FROM avg_by_minute a
+    CROSS JOIN eixo_atual e
+    ORDER BY minute;
+    """
+
+    with conn.cursor() as cur:
+        cur.execute(
+            sql,
+            (
+                days_ago,
+                f"{lookback_minutes} minutes",
+                merchants,
+                merchants,
+                f"{lookback_minutes} minutes",
+            )
+        )
+        rows = cur.fetchall()
+
+    df = pd.DataFrame(rows, columns=["minute", "total", "approved"])
+
+    if not df.empty:
+        df["minute"] = pd.to_datetime(df["minute"])
+        df["rate"] = (
+          df["approved"] / df["total"].where(df["total"] != 0) * 100
+        ).round(2).fillna(0)
+    else:
+        df["rate"] = pd.Series(dtype=float)
+
     return df
 
 import psycopg2.extras
@@ -204,7 +428,7 @@ def fetch_daily_metrics(conn, merchants):
     """
     sql = """
     WITH clientes_filtrados AS (
-      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s)
+      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s) OR codigo_cliente = ANY(%s)
     )
     SELECT
       COUNT(*) AS total_tx,
@@ -220,7 +444,7 @@ def fetch_daily_metrics(conn, merchants):
       AND codigo_cliente IN (SELECT codigo_cliente FROM clientes_filtrados);
     """
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-        cur.execute(sql, (merchants,))
+        cur.execute(sql, (merchants,merchants,))
         row = cur.fetchone() or {}
     return dict(
         total=int(row.get("total_tx") or 0),
@@ -239,7 +463,7 @@ def fetch_daily_currency_totals(conn, merchants):
     """
     sql = """
     WITH clientes_filtrados AS (
-      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s)
+      SELECT codigo_cliente FROM clientes WHERE nome_loja_resumido = ANY(%s) OR codigo_cliente = ANY(%s) 
     )
     SELECT
       COALESCE(NULLIF(moeda, ''), 'UNK') AS moeda,
@@ -253,7 +477,7 @@ def fetch_daily_currency_totals(conn, merchants):
     """
     out = []
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-        cur.execute(sql, (merchants,))
+        cur.execute(sql, (merchants,merchants,))
         for r in cur.fetchall():
             out.append({
                 "moeda": r["moeda"],
